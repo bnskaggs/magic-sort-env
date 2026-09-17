@@ -5,12 +5,14 @@ where the skill lives.
 
 ## Artifact Status
 
-Magic Sort Env is **eval-proven, trainer-unverified**.
+Magic Sort Env is **engine-tested, eval-incomplete, trainer-unverified**.
 
 It exposes the same `load_environment()` interface used by Prime Intellect's
 `verifiers` environments and has train/eval splits, generated tasks, reward
-shaping, and difficulty knobs. It has not yet been run through a full training
-job, so the README does not claim "training-proven."
+shaping, and difficulty knobs. The engine and reward are covered by tests and a
+deterministic exploit pass. What has *not* happened: a full eval of a model
+playing the current code, and any training run at all. The README does not
+claim otherwise.
 
 ## Design Choices
 

@@ -1,7 +1,7 @@
 # Results
 
-All results here are smoke reads unless stated otherwise. The environment is
-eval-proven and trainer-unverified.
+All results here are smoke or pre-hardening reads. **No full
+model-vs-environment eval has been completed against the current code.**
 
 ## Baseline (Before v1 Hardening)
 

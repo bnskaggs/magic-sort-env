@@ -6,19 +6,29 @@ Take a shipped game mechanic, turn it into a reusable RL environment, and
 document the reward design well enough that another environment builder can
 audit it.
 
-Status: **eval-proven, trainer-unverified**. The environment runs under
-`vf-eval` and has tests for its mechanics, generator, reward decomposition, and
-known exploit fixes. It has not yet been consumed by a full `prime-rl` training
-job.
+Status: **engine-tested, eval-incomplete, trainer-unverified.**
+
+- Mechanics, generator, exact par, and reward decomposition are covered by
+  tests (`uv run pytest`).
+- The reward-design defenses are checked by a deterministic exploit pass
+  (`uv run python -m magic_sort_env.exploits`).
+- The `vf-eval` wrapper has been smoke-run end to end, but **no full
+  model-vs-environment eval has been completed against the current code**. The
+  numbers in `results/` either predate the v1 hardening or were token-capped
+  plumbing checks. Earning back a stronger claim means running the eval; see
+  `results/results.md` for the exact commands.
+- No training run has been performed.
 
 ## Why This Exists
 
 Most public environments test single-turn instruction following or short tool
 loops. Magic Sort is different: it asks a model to plan through a multi-turn,
-hard-constraint state space. In an early smoke eval, `gpt-5-nano` saturated
-instruction-following and Wordle-style environments, then solved only 1 of 6
-easy Magic Sort rollouts. That makes this a useful training target rather than
-just another solved benchmark.
+hard-constraint state space. In pre-tuning evals — the `easy` tier as it stood
+with a single empty bottle — `gpt-5-nano` saturated instruction-following and
+Wordle-style environments but solved only 1 of 6 Magic Sort rollouts. The
+shipped `easy` tier has since been widened to two empty bottles to reduce
+unsolvable dead ends and has **not** been re-measured, so treat that figure as
+a directional signal about task class, not a current benchmark.
 
 ## Environment Protocol
 
@@ -123,8 +133,13 @@ reward and pass rates.
 
 ## Honest Limits
 
-- Eval-proven, trainer-unverified.
-- The current `vf-eval` run path uses `--disable-env-server` on Windows.
+- Engine-tested and eval-incomplete: no full model-vs-environment eval has been
+  run against the current code, and no training run has happened.
+- `results/` numbers are either pre-hardening or token-capped plumbing checks,
+  labelled as such.
+- Hidden layers and stuck bottles are unit-tested but have not been observed in
+  a live model rollout.
+- The current `vf-eval` path uses `--disable-env-server` on Windows.
 - No claims are made about skill transfer from Magic Sort to other domains.
 - Hidden-layer `par` is omniscient and documented as such.
 
