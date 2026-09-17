@@ -1,0 +1,42 @@
+[project]
+name = "magic-sort-env"
+version = "0.1.0"
+description = "A Magic Sort / water-sort RL environment with solver-verified par, exploit-aware rewards, and partial-information variants."
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = { text = "MIT" }
+authors = [{ name = "bnskaggs" }]
+dependencies = [
+    "datasets>=5.0.0",
+    "verifiers>=0.3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/magic_sort_env"]
+include = ["src/magic_sort.py"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/",
+    "tests/",
+    "README.md",
+    "DESIGN.md",
+    "LICENSE",
+    "pyproject.toml",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.verifiers.eval]
+num_examples = 5
+rollouts_per_example = 2
