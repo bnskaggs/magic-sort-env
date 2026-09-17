@@ -67,6 +67,48 @@ def test_replay_stops_repeated_no_progress_loop():
     assert result.repeated_messages == 1
 
 
+def test_replay_first_illegal_is_free_and_repeat_gets_hint():
+    completion = [
+        {"role": "assistant", "content": "pour 0 1"},
+        {"role": "assistant", "content": "pour 0 1"},
+    ]
+
+    result = replay(_info(), completion)
+
+    assert result.illegal_moves == 2
+    assert result.legal_hints == 1
+    assert result.moves == 1
+
+
+def test_replay_does_not_hint_after_intervening_legal_move():
+    completion = [
+        {"role": "assistant", "content": "pour 0 1"},
+        {"role": "assistant", "content": "pour 0 4"},
+        {"role": "assistant", "content": "pour 0 1"},
+    ]
+
+    result = replay(_info(), completion)
+
+    assert result.illegal_moves == 2
+    assert result.legal_hints == 0
+    assert result.moves == 2
+
+
+def test_env_response_explains_illegal_move_and_escalates_on_repeat():
+    env = MagicSortEnv(dataset=Dataset.from_list([{"prompt": [], "answer": "", "info": _info()}]))
+    state = asyncio.run(env.setup_state({"info": _info()}))
+
+    first = asyncio.run(env.env_response([vf.AssistantMessage(content="pour 0 1")], state))
+    second = asyncio.run(env.env_response([vf.AssistantMessage(content="pour 0 1")], state))
+
+    assert "destination bottle 1 is full" in first[0].content
+    assert "No turn consumed" in first[0].content
+    assert "legal moves:" not in first[0].content
+    assert state["moves"] == 1
+    assert "Wasted a turn" in second[0].content
+    assert "legal moves:" in second[0].content
+
+
 def test_env_response_returns_typed_user_messages_on_dead_end():
     env = MagicSortEnv(dataset=Dataset.from_list([{"prompt": [], "answer": "", "info": _info()}]))
     state = {

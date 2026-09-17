@@ -54,6 +54,7 @@ class ReplayResult:
     illegal_moves: int
     repeated_messages: int
     no_progress_stopped: bool
+    legal_hints: int
     dead_end_called: bool
     reveals: int
     moves_after_first_reveal: int
@@ -113,6 +114,38 @@ def legal(
     if not src or len(dst) >= depth:
         return False
     return len(dst) == 0 or dst[-1] == src[-1]
+
+
+def illegal_reason(
+    board: Iterable[Iterable[str]],
+    origin: int,
+    destination: int,
+    depth: int,
+    stuck: Iterable[int] = (),
+) -> str | None:
+    """Explain why a pour is illegal, or return None if it is legal."""
+
+    state = thaw(board)
+    stuck_set = set(stuck)
+    if origin == destination:
+        return "origin and destination are the same bottle"
+    if origin < 0 or destination < 0:
+        return "bottle index is negative"
+    if origin >= len(state):
+        return f"source bottle {origin} does not exist"
+    if destination >= len(state):
+        return f"destination bottle {destination} does not exist"
+    if origin in stuck_set:
+        return f"source bottle {origin} is stuck"
+    src = state[origin]
+    dst = state[destination]
+    if not src:
+        return f"source bottle {origin} is empty"
+    if len(dst) >= depth:
+        return f"destination bottle {destination} is full"
+    if dst and dst[-1] != src[-1]:
+        return f"destination top {dst[-1]} does not match source top {src[-1]}"
+    return None
 
 
 def apply_pour(
@@ -436,6 +469,12 @@ def reveal_after_pour(
 
 
 TIERS = {
+    # micro exists because trivial is already too hard for small open-weights
+    # models: measured 2026-09-17, 1B-3B produce zero legal first moves and a
+    # quantized 7B solves 0/8 full rollouts on trivial. With 2 colors and 3
+    # empties most random pours are legal, so a small model can finish puzzles
+    # and produce the reward variance training needs.
+    "micro": dict(n_colors=2, n_empty=3, depth=4, stuck_range=(0, 0), hidden_range=(0, 0)),
     "trivial": dict(n_colors=3, n_empty=2, depth=4, stuck_range=(0, 0), hidden_range=(0, 0)),
     "easy": dict(n_colors=4, n_empty=2, depth=4, stuck_range=(0, 0), hidden_range=(0, 0)),
     "medium": dict(n_colors=6, n_empty=2, depth=4, stuck_range=(0, 1), hidden_range=(0, 1)),
@@ -592,6 +631,7 @@ def rollout_policy(puzzle: Puzzle, policy_name: str, cap_multiple: int = 3) -> R
         illegal_moves=0,
         repeated_messages=0,
         no_progress_stopped=False,
+        legal_hints=0,
         dead_end_called=dead_end,
         reveals=reveals,
         moves_after_first_reveal=0 if first_reveal_move is None else max(0, moves - first_reveal_move),

@@ -18,6 +18,9 @@ Status: **engine-tested, eval-run, trainer-unverified.**
   the reward decomposes as designed. **That eval also showed `easy` is
   saturated for this model**, so it is a usable eval for weaker models but the
   wrong tier for training this class.
+- A local Ollama band probe found the first trainable pair:
+  `qwen2.5:7b-instruct` on `micro` solved 4/8 after illegal-move feedback was
+  added. This is a band read, not a training result.
 - No training run has been performed. The `dataset` (train) split, shaped
   rewards as gradient, and group variance as advantage have never executed.
 
@@ -51,11 +54,15 @@ Rules:
 - Hidden cells are shown as `?`; they reveal when layers above them are poured
   off.
 - Solved means every bottle is empty or full of one color.
+- Illegal moves name the reason. The first illegal move is free; later illegal
+  moves waste a turn. Repeating the same illegal move consecutively also shows
+  the current legal-move list.
 
 ## Tiers
 
 | Tier | Colors | Empty Bottles | Layered Mechanics |
 |---|---:|---:|---|
+| `micro` | 2 | 3 | none |
 | `trivial` | 3 | 2 | none |
 | `easy` | 4 | 2 | none |
 | `medium` | 6 | 2 | 0-1 stuck and/or hidden bottle |
@@ -142,11 +149,9 @@ reward and pass rates.
 
 ## Honest Limits
 
-- Engine-tested and eval-run, but **no training run has happened**, and the
-  band tests suggest no shipped tier is yet trainable by a 1B-7B model: 1B fails
-  the output protocol, 3B fails board legality, and 7B plays competently
-  (progress ~0.52) but loops on repeated illegal moves and solves 0/8 on
-  `trivial`. See [results/results.md](results/results.md).
+- Engine-tested and eval-run, but **no training run has happened**. The first
+  local trainable band is `qwen2.5:7b-instruct` on `micro` after illegal-move
+  feedback (4/8 solves, reward std 0.593). See [results/results.md](results/results.md).
 - `results/` numbers are small-sample. Ollama-served models are quantized.
 - Hidden layers and stuck bottles are unit-tested but have not been observed in
   a live model rollout.

@@ -101,6 +101,38 @@ disabled before they can be assessed here.
 | no-progress stops | 6/8 |
 | output tokens per rollout | ~122 |
 
+**Full rollouts, `qwen2.5:7b-instruct` on `micro`, before illegal-feedback
+fix** (4 puzzles x 2 rollouts, `--max-tokens 400`). `micro` (2 colors, 3
+empties, depth 4, par 3-7) was added after the trivial run above; a seeded
+random policy solves 23/30 seeds on it, so the tier itself is finishable by a
+weak policy.
+
+| Metric | Value |
+|---|---|
+| solve rate | 0/8 (max reward 0.56, below the >= 1.0 solve floor) |
+| outcome reward | 0.376 +/- 0.114 (consolation only) |
+| progress | 0.669 |
+| illegal-move rate | 0.383 |
+| mean turns | 12.8 |
+| no-progress stops | 2/8 |
+| output tokens per rollout | ~77 |
+
+**Full rollouts, `qwen2.5:7b-instruct` on `micro`, after illegal-feedback fix**
+(4 puzzles x 2 rollouts, `--max-tokens 400`). Illegal moves now name the
+failure reason, the first illegal move is free, and consecutive identical
+illegal moves trigger a legal-move list.
+
+| Metric | Value |
+|---|---|
+| solve rate | 4/8 |
+| outcome reward | 0.830 +/- 0.593 |
+| progress | 0.787 |
+| illegal-move rate | 0.360 |
+| mean turns | 13.4 |
+| no-progress stops | 3/8 |
+| legal hints shown | 0 |
+| output tokens per rollout | ~81 |
+
 **Findings:**
 
 1. **Model size sets a hard floor on playability.** 1B cannot follow the output
@@ -112,10 +144,22 @@ disabled before they can be assessed here.
    then 6 of 8 rollouts end in the repeat-stop — after an illegal move the board
    is unchanged, so the model re-issues the same move until the loop guard fires.
    This is a distinct failure from "cannot plan."
-3. **Consequence for training: no shipped tier is currently trainable by a
-   1B-7B model.** A `micro` configuration (2 colors, 3 empties, par 2-4) via the
-   `n_colors` / `n_empty` overrides is the next thing to try, alongside a
-   loop-breaking nudge on repeated illegal moves.
+3. **`micro` moved the failure mode but not the solve rate by itself.** Versus trivial:
+   progress up (0.52 -> 0.67), repeat-stop deaths down (6/8 -> 2/8), turns down
+   (20.9 -> 12.8) — and still 0/8 solves. The transcripts show why: the model
+   no longer re-issues one identical move; it shotguns *different* illegal
+   pours (38% of all moves) until the 3x-par cap burns out. The binding
+   constraint is now legality feedback — the environment says only "illegal,
+   wasted a turn" with no reason — which is exactly the loop-breaker decision.
+4. **Illegal-reason feedback cleared the training gate.** The post-fix micro
+   probe solved 4/8, which lands inside the 20-80% band with real reward spread
+   (std 0.593). The legal-move list did not appear in this sample
+   (`legal_hint_count=0`), so the lift came from naming the reason and giving one
+   free correction, not from converting planning into lookup.
+5. **Consequence for training: `qwen2.5:7b-instruct` + `micro` is the first
+   trainable pair.** It is still a tiny local/quantized band read, not a training
+   result. Hosted training should use the closest available bf16 model and keep
+   the solve-rate gate as the preflight check.
 
 ### Deterministic Exploit Pass
 
@@ -123,10 +167,10 @@ Command: `uv run python -m magic_sort_env.exploits`.
 
 | Probe | Before | After | Finding |
 |---|---|---|---|
-| dead-end false negative | 39 turns, reward 0.000 | 5 moves, reward 0.253 | terminal dead-end detection cuts loop burn and gives progress credit |
+| dead-end false negative | 39 turns, reward 0.000 | 4 moves, reward 0.253 | terminal dead-end detection cuts loop burn and gives progress credit |
 | failure-gradient | 0.000 vs 0.000 | 0.281 vs 0.366 | progress consolation creates spread among failures without reaching solve payout |
 | fog-farming | hypothetical reveal reward 0.483 (1 reveal) | current reward 0.383 (1 reveal logged only) | reveals are metrics, not rewards; omniscient par prices exploratory pours |
-| stuck no-op loop | would run to cap 39 turns | stopped=True, moves=3, reward=0.239 | repeat-stop catches identical stuck-bottle attempts |
+| stuck no-op loop | would run to cap 39 turns | stopped=True, moves=2, reward=0.239 | repeat-stop catches identical stuck-bottle attempts |
 
 ### Framework-Free Policy Smoke
 

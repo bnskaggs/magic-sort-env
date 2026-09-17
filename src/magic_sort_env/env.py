@@ -43,6 +43,10 @@ def dead_end_call(text: str) -> bool:
     return bool(NO_LEGAL_RE.search(text))
 
 
+def format_legal_moves(moves: list[tuple[int, int]]) -> str:
+    return ", ".join(f"pour {origin} {destination}" for origin, destination in moves)
+
+
 def assistant_texts(completion: list[dict[str, Any]]) -> list[str]:
     return [
         str(message.get("content") or "")
@@ -76,10 +80,13 @@ def replay(info: dict[str, Any], completion: list[dict[str, Any]]) -> core.Repla
     reveals = 0
     first_reveal_move: int | None = None
     illegal_after_reveal = 0
+    legal_hints = 0
     seen_messages: Counter[str] = Counter()
     cap = int(info.get("cap", puzzle.par * 3))
     moves = 0
     parse_warnings = 0
+    illegal_free_used = False
+    last_illegal: tuple[int, int] | None = None
 
     for text in assistant:
         normalized = " ".join(text.lower().split())
@@ -104,17 +111,26 @@ def replay(info: dict[str, Any], completion: list[dict[str, Any]]) -> core.Repla
                 moves += 1
             if moves >= cap:
                 break
+            last_illegal = None
             continue
         parsed_turns += 1
-        moves += 1
         if not core.legal(board, move[0], move[1], puzzle.depth, puzzle.stuck):
             illegal_moves += 1
+            if last_illegal == move:
+                legal_hints += 1
+            if illegal_free_used:
+                moves += 1
+            else:
+                illegal_free_used = True
             if first_reveal_move is not None:
                 illegal_after_reveal += 1
+            last_illegal = move
             if moves >= cap:
                 break
             continue
 
+        moves += 1
+        last_illegal = None
         old_hidden = core.hidden_cell_count(mask)
         board, moved = core.apply_pour(board, move[0], move[1], puzzle.depth)
         mask = core.reveal_after_pour(mask, move[0], move[1], moved)
@@ -149,6 +165,7 @@ def replay(info: dict[str, Any], completion: list[dict[str, Any]]) -> core.Repla
         illegal_moves=illegal_moves,
         repeated_messages=repeated_messages,
         no_progress_stopped=no_progress_stopped,
+        legal_hints=legal_hints,
         dead_end_called=dead_end_called,
         reveals=reveals,
         moves_after_first_reveal=0 if first_reveal_move is None else max(0, moves - first_reveal_move),
@@ -203,6 +220,10 @@ def no_progress_stop_metric(completion, info, **kwargs) -> float:
     return 1.0 if replay(info, completion).no_progress_stopped else 0.0
 
 
+def legal_hint_count(completion, info, **kwargs) -> float:
+    return float(replay(info, completion).legal_hints)
+
+
 class MagicSortEnv(vf.MultiTurnEnv):
     def __init__(
         self,
@@ -224,6 +245,8 @@ class MagicSortEnv(vf.MultiTurnEnv):
         state["moves"] = 0
         state["parse_warnings"] = 0
         state["last_messages"] = []
+        state["illegal_free_used"] = False
+        state["last_illegal"] = None
         state["cap"] = int(self.cap_multiple * info["par"])
         info["cap"] = state["cap"]
         info["repeat_stop"] = self.repeat_stop
@@ -261,17 +284,20 @@ class MagicSortEnv(vf.MultiTurnEnv):
         if move is None:
             if self.strict_format and state["parse_warnings"] == 0:
                 state["parse_warnings"] += 1
+                state["last_illegal"] = None
                 return self._message(
                     "format warning: reply with exactly one command like `pour 3 1`. "
                     "No turn consumed.\n"
                     f"{core.render(state['visible_board'])}"
                 )
             state["moves"] += 1
+            state["last_illegal"] = None
             reply = "No valid `pour O D` command found. Wasted a turn."
         else:
             origin, destination = move
-            state["moves"] += 1
             if core.legal(state["true_board"], origin, destination, depth, stuck):
+                state["moves"] += 1
+                state["last_illegal"] = None
                 old_hidden = core.hidden_cell_count(state["hidden_mask"])
                 state["true_board"], moved = core.apply_pour(
                     state["true_board"], origin, destination, depth
@@ -289,7 +315,21 @@ class MagicSortEnv(vf.MultiTurnEnv):
                 reveal_note = " reveal" if revealed > 0 else ""
                 reply = f"ok{reveal_note}"
             else:
-                reply = f"illegal: pour {origin} {destination} not allowed. Wasted a turn."
+                repeated_illegal = state.get("last_illegal") == move
+                reason = core.illegal_reason(
+                    state["true_board"], origin, destination, depth, stuck
+                ) or "not allowed"
+                parts = [f"illegal: pour {origin} {destination} - {reason}."]
+                if state.get("illegal_free_used"):
+                    state["moves"] += 1
+                    parts.append("Wasted a turn.")
+                else:
+                    state["illegal_free_used"] = True
+                    parts.append("No turn consumed; further illegal moves waste a turn.")
+                if repeated_illegal:
+                    parts.append(f"legal moves: {format_legal_moves(legal_now)}")
+                state["last_illegal"] = move
+                reply = " ".join(parts)
 
         board_text = core.render(state["visible_board"])
         if core.is_solved(state["true_board"], depth):
@@ -395,6 +435,7 @@ def load_environment(
     rubric.add_metric(moves_after_first_reveal)
     rubric.add_metric(illegal_after_reveal_rate)
     rubric.add_metric(no_progress_stop_metric)
+    rubric.add_metric(legal_hint_count)
 
     return MagicSortEnv(
         dataset=train,

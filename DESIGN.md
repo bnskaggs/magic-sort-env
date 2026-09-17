@@ -5,14 +5,13 @@ where the skill lives.
 
 ## Artifact Status
 
-Magic Sort Env is **engine-tested, eval-incomplete, trainer-unverified**.
+Magic Sort Env is **engine-tested, eval-run, trainer-unverified**.
 
 It exposes the same `load_environment()` interface used by Prime Intellect's
 `verifiers` environments and has train/eval splits, generated tasks, reward
 shaping, and difficulty knobs. The engine and reward are covered by tests and a
-deterministic exploit pass. What has *not* happened: a full eval of a model
-playing the current code, and any training run at all. The README does not
-claim otherwise.
+deterministic exploit pass. Live evals and local band probes have run. What has
+*not* happened: any training run at all. The README does not claim otherwise.
 
 ## Design Choices
 
@@ -86,7 +85,7 @@ the mirror image of reward hacking: the verifier failing to recognize legitimate
 play.
 
 Measured probe: the old path would run to 39 turns and score 0.000; the hardened
-path stops after 5 moves and scores 0.253 from progress plus dead-end credit.
+path stops after 4 moves and scores 0.253 from progress plus dead-end credit.
 
 ### 5. No Gradient Among Failures
 
@@ -109,7 +108,27 @@ confounded.
 Defense: `strict_format=True` gives one non-consuming format warning before
 unparseable output wastes a turn. Format is also reported separately as a metric.
 
-### 7. Stuck-Bottle No-Op Loops
+### 7. Illegal-Move Looping
+
+Observed in local band probes: a quantized 7B model could produce legal opening
+moves and sort about half the board, then fail by issuing illegal pours. On
+`trivial`, it often repeated the same illegal move until the repeat-stop fired.
+On `micro`, it mostly tried different illegal moves and burned the cap.
+
+Defense: illegal moves now name the specific reason (destination full, color
+mismatch, source empty, source stuck, or bad index). The first illegal move is
+free, mirroring the one free format warning, because it is a correction point
+rather than evidence of bad planning. Later illegal moves waste turns.
+Consecutive repeats of the same illegal move show the current legal-move list.
+That escalation is measured as `legal_hint_count`, because showing legal moves
+can turn planning into lookup.
+
+Measured probe: `qwen2.5:7b-instruct` on `micro` moved from 0/8 solves before
+feedback to 4/8 solves after feedback, with reward std 0.593. `legal_hint_count`
+was 0 in that sample, so the lift came from reason feedback and the free
+correction, not from legal-move lookup.
+
+### 8. Stuck-Bottle No-Op Loops
 
 Risk: repeatedly trying to pour from a stuck bottle can burn turns without
 meaningful state change.
@@ -118,9 +137,9 @@ Defense: illegal moves waste turns, no reward is attached to attempts, and the
 repeat-stop catches identical no-progress loops.
 
 Measured probe: repeated pours from a stuck bottle would run to a 39-turn cap;
-the hardened path stops after 3 consumed moves with `no_progress_stop=True`.
+the hardened path stops after 2 consumed moves with `no_progress_stop=True`.
 
-### 8. Fog Farming
+### 9. Fog Farming
 
 Risk: on hidden-layer tiers, a model may make cheap exploratory pours purely to
 trigger reveals rather than progress toward solve.
@@ -139,7 +158,7 @@ rollout on `trivial`, a tier with no hidden cells at all. Reveals are now
 counted as decreases in the hidden-cell count (`core.hidden_cell_count`), with
 a regression test. Any earlier reveal figures in this repo's history are wrong.
 
-### 9. Rates Reward Small Denominators
+### 10. Rates Reward Small Denominators
 
 General lesson: bare rates make "do one thing perfectly
 and stop" look good.
@@ -147,7 +166,7 @@ and stop" look good.
 Defense: Magic Sort has no quality-rate reward. Efficiency is conditional on
 solve; progress is normalized over every bottle.
 
-### 10. Easy-Only Exploit Testing
+### 11. Easy-Only Exploit Testing
 
 General lesson: a reward spec can be safe in an easy world and
 farmed in a hard one.
@@ -158,7 +177,8 @@ with.
 
 ## Open Design Knobs
 
-- Tune `easy` into the 20-80% solve band for the target model.
+- Re-run the 20-80% solve-rate gate for the exact hosted-training model, not
+  just local quantized `qwen2.5:7b-instruct`.
 - Decide whether hidden layers belong on `medium` by default or only in `hard`.
 - Decide whether "no legal moves" should remain a tiny credit or a pure
   terminal annotation.

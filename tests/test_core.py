@@ -22,6 +22,20 @@ def test_pour_legality_checks_capacity_match_empty_and_stuck():
     assert not core.legal(board, 0, 3, depth=4, stuck=(0,))
 
 
+def test_illegal_reason_names_legality_failure():
+    board = (("A", "B"), ("C",), ("B", "B", "B", "B"), ())
+
+    assert core.illegal_reason(board, 0, 0, depth=4) == "origin and destination are the same bottle"
+    assert core.illegal_reason(board, -1, 0, depth=4) == "bottle index is negative"
+    assert core.illegal_reason(board, 9, 0, depth=4) == "source bottle 9 does not exist"
+    assert core.illegal_reason(board, 0, 9, depth=4) == "destination bottle 9 does not exist"
+    assert core.illegal_reason(board, 0, 3, depth=4, stuck=(0,)) == "source bottle 0 is stuck"
+    assert core.illegal_reason(((), ("A",)), 0, 1, depth=4) == "source bottle 0 is empty"
+    assert core.illegal_reason(board, 0, 2, depth=4) == "destination bottle 2 is full"
+    assert core.illegal_reason(board, 0, 1, depth=4) == "destination top C does not match source top B"
+    assert core.illegal_reason(board, 0, 3, depth=4) is None
+
+
 def test_generator_returns_solvable_exact_par_and_is_seeded():
     p1 = core.generate(tier="easy", seed=7)
     p2 = core.generate(tier="easy", seed=7)
@@ -142,6 +156,24 @@ def test_reveal_counting_ignores_ordinary_board_changes():
     _, moved2 = core.apply_pour((("A", "B", "B"), (), ()), 0, 1, depth=4)
     revealed_mask = core.reveal_after_pour(fogged, 0, 1, moved2)
     assert core.hidden_cell_count(revealed_mask) < core.hidden_cell_count(fogged)
+
+
+def test_micro_tier_is_playable_by_a_random_policy():
+    """micro exists so small models can finish puzzles.
+
+    The trainability signal is that even a random policy solves most seeds:
+    if random can't finish, a looping 3B-7B model certainly can't, and zero
+    solves means zero reward variance and zero gradient.
+    """
+    solved = 0
+    for seed in range(20):
+        puzzle = core.generate(tier="micro", seed=seed)
+        assert not puzzle.stuck
+        assert core.hidden_cell_count(puzzle.hidden_mask) == 0
+        assert 2 <= puzzle.par <= 8
+        if core.rollout_policy(puzzle, "random").solved:
+            solved += 1
+    assert solved >= 12
 
 
 def test_known_dead_end_position_has_no_legal_pours():
