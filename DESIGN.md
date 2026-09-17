@@ -128,9 +128,16 @@ trigger reveals rather than progress toward solve.
 Defense: reveals are metrics, not rewards. Omniscient par makes reveal-heavy
 solutions pay an efficiency cost.
 
-Measured probe: a hypothetical `+0.1 per reveal` reward would have paid 0.883
-for a reveal-farming line with 5 reveals; the current reward pays 0.383 and logs
-the 5 reveals as metrics only.
+Measured probe: a hypothetical `+0.1 per reveal` reward would have paid 0.483
+for a reveal-farming line with 1 genuine reveal; the current reward pays 0.383
+and logs the reveal as a metric only.
+
+**Metric bug found and fixed (2026-09-17).** The first `reveal_count`
+implementation compared the rendered board before and after each pour, so it
+counted *every successful pour* as a reveal — it reported 3.25 reveals per
+rollout on `trivial`, a tier with no hidden cells at all. Reveals are now
+counted as decreases in the hidden-cell count (`core.hidden_cell_count`), with
+a regression test. Any earlier reveal figures in this repo's history are wrong.
 
 ### 9. Rates Reward Small Denominators
 

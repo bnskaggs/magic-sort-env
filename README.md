@@ -142,13 +142,18 @@ reward and pass rates.
 
 ## Honest Limits
 
-- Engine-tested and eval-incomplete: no full model-vs-environment eval has been
-  run against the current code, and no training run has happened.
-- `results/` numbers are either pre-hardening or token-capped plumbing checks,
-  labelled as such.
+- Engine-tested and eval-run, but **no training run has happened**, and the
+  band tests suggest no shipped tier is yet trainable by a 1B-7B model: 1B fails
+  the output protocol, 3B fails board legality, and 7B plays competently
+  (progress ~0.52) but loops on repeated illegal moves and solves 0/8 on
+  `trivial`. See [results/results.md](results/results.md).
+- `results/` numbers are small-sample. Ollama-served models are quantized.
 - Hidden layers and stuck bottles are unit-tested but have not been observed in
   a live model rollout.
-- The current `vf-eval` path uses `--disable-env-server` on Windows.
+- A `reveal_count` bug (counted every pour as a reveal) was found and fixed on
+  2026-09-17; earlier reveal figures in the git history are wrong.
+- The current `vf-eval` path uses `--disable-env-server` on Windows. Saving
+  results fails for model names containing a colon on Windows (path syntax).
 - No claims are made about skill transfer from Magic Sort to other domains.
 - Hidden-layer `par` is omniscient and documented as such.
 

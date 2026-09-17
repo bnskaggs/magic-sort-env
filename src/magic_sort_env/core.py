@@ -396,6 +396,15 @@ def make_hidden_mask(
     return tuple(tuple(row) for row in hidden)
 
 
+def hidden_cell_count(hidden_mask: Iterable[Iterable[bool]]) -> int:
+    """Number of still-hidden cells. Reveals are decreases in this count.
+
+    Comparing rendered boards before/after a pour does NOT detect reveals: any
+    successful pour changes the board. Count the mask instead.
+    """
+    return sum(1 for row in hidden_mask for cell in row if cell)
+
+
 def visible_from(
     board: Iterable[Iterable[str]], hidden_mask: Iterable[Iterable[bool]]
 ) -> tuple[tuple[str, ...], ...]:
@@ -551,12 +560,12 @@ def rollout_policy(puzzle: Puzzle, policy_name: str, cap_multiple: int = 3) -> R
                 illegal_after_reveal += 1
             moves += 1
             continue
+        old_hidden = hidden_cell_count(mask)
         new_board, moved = apply_pour(board, move[0], move[1], puzzle.depth)
-        old_visible = visible_from(board, mask)
         mask = reveal_after_pour(mask, move[0], move[1], moved)
-        new_visible = visible_from(new_board, mask)
-        if new_visible != old_visible:
-            reveals += 1
+        newly_revealed = old_hidden - hidden_cell_count(mask)
+        if newly_revealed > 0:
+            reveals += newly_revealed
             if first_reveal_move is None:
                 first_reveal_move = moves + 1
         board = new_board

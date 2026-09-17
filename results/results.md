@@ -66,6 +66,57 @@ uv run vf-eval magic_sort -a '{\"tier\":\"easy\",\"num_train_examples\":5,\"num_
 5. **Saturation is model-relative.** 100% here says nothing about a 1B
    open-weights model on the same tier. Band checks must be re-run per model.
 
+### Small-Model Band Tests (Ollama, local)
+
+The question these answer: which model size can actually play this environment,
+and on which tier? Training needs a model that solves *some* rollouts — with no
+solves there is no reward spread and nothing to learn from.
+
+Served via Ollama (quantized weights, so these slightly understate the bf16
+versions a training platform would use).
+
+**First-move legality probes** — can the model emit a *legal* opening pour?
+
+| Model | Tier | Legal first moves | Failure mode |
+|---|---|---:|---|
+| `llama3.2:1b` | trivial | 0/3 | no parseable move (narrates prose instead of `pour O D`) |
+| `llama3.2:3b` | trivial | 0/3 | well-formed but illegal moves (misreads board legality) |
+| `qwen2.5:7b-instruct` | trivial | 4/4 | — |
+| `qwen2.5:7b-instruct` | easy | 4/4 | — |
+
+`qwen3:1.7b` is excluded: as a thinking model it consumed 1,200 tokens of
+reasoning and emitted **zero** content, failing on never-stopping-reasoning
+rather than on the task. Thinking models need a token budget or thinking
+disabled before they can be assessed here.
+
+**Full rollouts, `qwen2.5:7b-instruct` on `trivial`** (4 puzzles x 2 rollouts,
+`--max-tokens 400`):
+
+| Metric | Value |
+|---|---|
+| solve rate | 0/8 |
+| outcome reward | 0.258 (consolation only) |
+| progress | 0.519 |
+| mean turns | 20.9 |
+| no-progress stops | 6/8 |
+| output tokens per rollout | ~122 |
+
+**Findings:**
+
+1. **Model size sets a hard floor on playability.** 1B cannot follow the output
+   protocol; 3B follows it but cannot read legality; 7B does both perfectly on
+   first moves. That progression is a cleaner capability signal than any single
+   solve rate.
+2. **The 7B still solves nothing on `trivial`, but for a third reason: it
+   loops.** Progress averages 0.52, so it genuinely sorts about half the board,
+   then 6 of 8 rollouts end in the repeat-stop — after an illegal move the board
+   is unchanged, so the model re-issues the same move until the loop guard fires.
+   This is a distinct failure from "cannot plan."
+3. **Consequence for training: no shipped tier is currently trainable by a
+   1B-7B model.** A `micro` configuration (2 colors, 3 empties, par 2-4) via the
+   `n_colors` / `n_empty` overrides is the next thing to try, alongside a
+   loop-breaking nudge on repeated illegal moves.
+
 ### Deterministic Exploit Pass
 
 Command: `uv run python -m magic_sort_env.exploits`.
@@ -74,7 +125,7 @@ Command: `uv run python -m magic_sort_env.exploits`.
 |---|---|---|---|
 | dead-end false negative | 39 turns, reward 0.000 | 5 moves, reward 0.253 | terminal dead-end detection cuts loop burn and gives progress credit |
 | failure-gradient | 0.000 vs 0.000 | 0.281 vs 0.366 | progress consolation creates spread among failures without reaching solve payout |
-| fog-farming | hypothetical reveal reward 0.883 (5 reveals) | current reward 0.383 (5 reveals logged only) | reveals are metrics, not rewards; omniscient par prices exploratory pours |
+| fog-farming | hypothetical reveal reward 0.483 (1 reveal) | current reward 0.383 (1 reveal logged only) | reveals are metrics, not rewards; omniscient par prices exploratory pours |
 | stuck no-op loop | would run to cap 39 turns | stopped=True, moves=3, reward=0.239 | repeat-stop catches identical stuck-bottle attempts |
 
 ### Framework-Free Policy Smoke

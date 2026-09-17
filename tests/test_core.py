@@ -121,6 +121,29 @@ def test_stuck_generation_never_uses_stuck_as_solution_source():
     assert puzzle.stuck
     assert not any(origin in puzzle.stuck for origin, _ in path)
 
+def test_reveal_counting_ignores_ordinary_board_changes():
+    """A pour changes the board; that is not a reveal.
+
+    The first implementation compared rendered boards before and after a pour,
+    so it counted every successful pour as a reveal - including on tiers with no
+    hidden cells at all.
+    """
+    board = (("A", "B", "B"), (), ())
+    no_fog = ((False, False, False), (), ())
+
+    before = core.hidden_cell_count(no_fog)
+    _, moved = core.apply_pour(board, 0, 1, depth=4)
+    after_mask = core.reveal_after_pour(no_fog, 0, 1, moved)
+
+    assert before == 0
+    assert core.hidden_cell_count(after_mask) == 0
+
+    fogged = ((True, True, False), (), ())
+    _, moved2 = core.apply_pour((("A", "B", "B"), (), ()), 0, 1, depth=4)
+    revealed_mask = core.reveal_after_pour(fogged, 0, 1, moved2)
+    assert core.hidden_cell_count(revealed_mask) < core.hidden_cell_count(fogged)
+
+
 def test_known_dead_end_position_has_no_legal_pours():
     board = (
         ("C", "C"),

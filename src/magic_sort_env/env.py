@@ -115,12 +115,12 @@ def replay(info: dict[str, Any], completion: list[dict[str, Any]]) -> core.Repla
                 break
             continue
 
-        old_visible = core.visible_from(board, mask)
+        old_hidden = core.hidden_cell_count(mask)
         board, moved = core.apply_pour(board, move[0], move[1], puzzle.depth)
         mask = core.reveal_after_pour(mask, move[0], move[1], moved)
-        new_visible = core.visible_from(board, mask)
-        if new_visible != old_visible:
-            reveals += 1
+        newly_revealed = old_hidden - core.hidden_cell_count(mask)
+        if newly_revealed > 0:
+            reveals += newly_revealed
             if first_reveal_move is None:
                 first_reveal_move = moves
         if core.is_solved(board, puzzle.depth) or moves >= cap:
@@ -272,7 +272,7 @@ class MagicSortEnv(vf.MultiTurnEnv):
             origin, destination = move
             state["moves"] += 1
             if core.legal(state["true_board"], origin, destination, depth, stuck):
-                old_visible = state["visible_board"]
+                old_hidden = core.hidden_cell_count(state["hidden_mask"])
                 state["true_board"], moved = core.apply_pour(
                     state["true_board"], origin, destination, depth
                 )
@@ -285,7 +285,8 @@ class MagicSortEnv(vf.MultiTurnEnv):
                 state["visible_board"] = core.visible_from(
                     state["true_board"], state["hidden_mask"]
                 )
-                reveal_note = " reveal" if state["visible_board"] != old_visible else ""
+                revealed = old_hidden - core.hidden_cell_count(state["hidden_mask"])
+                reveal_note = " reveal" if revealed > 0 else ""
                 reply = f"ok{reveal_note}"
             else:
                 reply = f"illegal: pour {origin} {destination} not allowed. Wasted a turn."
