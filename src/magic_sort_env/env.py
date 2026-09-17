@@ -338,6 +338,7 @@ def build_dataset(
     tier: str,
     use_stuck: bool | None,
     use_hidden: bool | None,
+    overrides: dict[str, Any] | None = None,
 ) -> Dataset:
     rows = []
     seed = seed0
@@ -349,6 +350,7 @@ def build_dataset(
                     seed=seed,
                     use_stuck=use_stuck,
                     use_hidden=use_hidden,
+                    **(overrides or {}),
                 )
             )
         )
@@ -365,10 +367,21 @@ def load_environment(
     repeat_stop: int = 4,
     use_stuck: bool | None = None,
     use_hidden: bool | None = None,
+    n_colors: int | None = None,
+    n_empty: int | None = None,
+    depth: int | None = None,
     **kwargs,
 ) -> vf.Environment:
-    train = build_dataset(num_train_examples, 0, tier, use_stuck, use_hidden)
-    evald = build_dataset(num_eval_examples, 1_000_000, tier, use_stuck, use_hidden)
+    # n_colors / n_empty / depth override the tier so the difficulty band can be
+    # tuned per model without editing tier definitions. One empty bottle moved
+    # gpt-5-nano from 1/6 to 6/6 on easy, so this is the first dial to reach for.
+    overrides = {
+        k: v
+        for k, v in (("n_colors", n_colors), ("n_empty", n_empty), ("depth", depth))
+        if v is not None
+    }
+    train = build_dataset(num_train_examples, 0, tier, use_stuck, use_hidden, overrides)
+    evald = build_dataset(num_eval_examples, 1_000_000, tier, use_stuck, use_hidden, overrides)
 
     rubric = vf.Rubric()
     rubric.add_reward_func(outcome_reward, weight=1.0)

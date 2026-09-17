@@ -6,29 +6,30 @@ Take a shipped game mechanic, turn it into a reusable RL environment, and
 document the reward design well enough that another environment builder can
 audit it.
 
-Status: **engine-tested, eval-incomplete, trainer-unverified.**
+Status: **engine-tested, eval-run, trainer-unverified.**
 
 - Mechanics, generator, exact par, and reward decomposition are covered by
   tests (`uv run pytest`).
 - The reward-design defenses are checked by a deterministic exploit pass
   (`uv run python -m magic_sort_env.exploits`).
-- The `vf-eval` wrapper has been smoke-run end to end, but **no full
-  model-vs-environment eval has been completed against the current code**. The
-  numbers in `results/` either predate the v1 hardening or were token-capped
-  plumbing checks. Earning back a stronger claim means running the eval; see
-  `results/results.md` for the exact commands.
-- No training run has been performed.
+- A full model-vs-environment eval has been run on the `easy` tier
+  (`gpt-5-nano`, 6 rollouts, 100% solve, reward 1.828 +/- 0.139) — see
+  [results/results.md](results/results.md). The environment runs end to end and
+  the reward decomposes as designed. **That eval also showed `easy` is
+  saturated for this model**, so it is a usable eval for weaker models but the
+  wrong tier for training this class.
+- No training run has been performed. The `dataset` (train) split, shaped
+  rewards as gradient, and group variance as advantage have never executed.
 
 ## Why This Exists
 
 Most public environments test single-turn instruction following or short tool
 loops. Magic Sort is different: it asks a model to plan through a multi-turn,
-hard-constraint state space. In pre-tuning evals — the `easy` tier as it stood
-with a single empty bottle — `gpt-5-nano` saturated instruction-following and
-Wordle-style environments but solved only 1 of 6 Magic Sort rollouts. The
-shipped `easy` tier has since been widened to two empty bottles to reduce
-unsolvable dead ends and has **not** been re-measured, so treat that figure as
-a directional signal about task class, not a current benchmark.
+hard-constraint state space, and its difficulty is unusually sharp: for
+`gpt-5-nano`, the `easy` tier with **one** empty bottle scored 1/6, and with
+**two** empty bottles scored 6/6. One bottle spans the entire range from
+near-impossible to saturated, which makes the tier knobs a precise instrument
+for putting a given model inside the useful 20-80% band.
 
 ## Environment Protocol
 
@@ -60,8 +61,16 @@ Rules:
 | `medium` | 6 | 2 | 0-1 stuck and/or hidden bottle |
 | `hard` | 8 | 2 | 1-2 stuck bottles and 1-2 hidden bottles |
 
-The second empty bottle on `easy` is deliberate. A one-empty easy tier caused
-dead ends and expensive failed rollouts in early evals.
+**Difficulty is extremely sensitive to the empty-bottle count.** For
+`gpt-5-nano`, `easy` with 1 empty solved 1/6 and with 2 empties solved 6/6.
+Rather than editing tiers, override the dial directly:
+
+```powershell
+uv run vf-eval magic_sort -a '{\"tier\":\"easy\",\"n_empty\":1}' --provider openai -m gpt-5-nano -n 3 -r 2 --disable-tui --disable-env-server
+```
+
+`n_colors`, `n_empty`, and `depth` all override the selected tier, so a single
+tier can be walked across the 20-80% band for whatever model you are targeting.
 
 ## Reward
 

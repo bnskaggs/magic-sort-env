@@ -442,9 +442,21 @@ def generate(
     use_hidden: bool | None = None,
     stuck_count: int | None = None,
     hidden_count: int | None = None,
+    n_colors: int | None = None,
+    n_empty: int | None = None,
+    depth: int | None = None,
     node_cap: int = 300_000,
 ) -> Puzzle:
-    cfg = TIERS[tier]
+    cfg = dict(TIERS[tier])
+    # Overrides matter because difficulty here is extremely sensitive: for
+    # gpt-5-nano, easy with 1 empty solved 1/6 and with 2 empties solved 6/6.
+    # The colors/empties ratio is the primary band control.
+    if n_colors is not None:
+        cfg["n_colors"] = n_colors
+    if n_empty is not None:
+        cfg["n_empty"] = n_empty
+    if depth is not None:
+        cfg["depth"] = depth
     rng = random.Random(seed)
     use_stuck = tier in {"medium", "hard"} if use_stuck is None else use_stuck
     use_hidden = tier in {"medium", "hard"} if use_hidden is None else use_hidden

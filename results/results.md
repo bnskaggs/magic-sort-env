@@ -19,6 +19,53 @@ the environment forced 33 extra turns. That failure drove the v1 blocker fixes.
 
 ## Current Repo
 
+### Live Eval: `easy` Tier, Post-Hardening
+
+Command:
+
+```powershell
+uv run vf-eval magic_sort -a '{\"tier\":\"easy\",\"num_train_examples\":5,\"num_eval_examples\":5}' --provider openai -m gpt-5-nano -n 3 -r 2 --disable-tui --disable-env-server --save-results
+```
+
+3 puzzles x 2 rollouts. Saved to `outputs/evals/magic_sort--gpt-5-nano/e5b71f34`.
+
+| Metric | Value |
+|---|---|
+| solve rate | 6/6 (100%) |
+| reward mean | 1.828 |
+| reward std | 0.139 |
+| par | 12-13 |
+| moves taken | 16-29 |
+| mean turns | 21.2 |
+| illegal-move rate | 0.00-0.08 |
+| dead ends | 0 |
+| no-progress stops | 0 |
+| total output tokens | 649,793 |
+
+**Findings:**
+
+1. **`easy` is saturated for this model.** The tier is 4 colors with 2 empty
+   bottles. The earlier 1-empty configuration scored 1/6 for the same model.
+   **One empty bottle moved the solve rate from 17% to 100%** — the
+   `colors / (colors + empties)` ratio is a far sharper difficulty dial than
+   expected, and it is the knob to reach for first.
+2. **A saturated tier teaches the wrong skill.** Reward std is non-zero
+   (0.139), so a trainer would still see gradient — but every rollout solved,
+   so the only variation is efficiency. Training here would teach shorter
+   solutions, not solving. Use a tighter configuration for training this model
+   class.
+3. **The dead-end path did not execute.** Zero dead ends occurred, because the
+   second empty bottle removes the condition that produced them. Dead-end
+   termination remains covered only by unit tests and the exploit probe, not by
+   live play.
+4. **Cost is driven by reasoning, not wasted turns.** 650k output tokens across
+   6 rollouts, essentially unchanged from the pre-hardening run, despite the
+   dead-end fix. The 21 legitimate turns each carry 4-7k reasoning tokens.
+   Turn count and model verbosity are the cost levers; loop-burn was not the
+   main expense.
+5. **Saturation is model-relative.** 100% here says nothing about a 1B
+   open-weights model on the same tier. Band checks must be re-run per model.
+
 ### Deterministic Exploit Pass
 
 Command: `uv run python -m magic_sort_env.exploits`.
