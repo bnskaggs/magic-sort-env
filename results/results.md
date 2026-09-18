@@ -194,10 +194,64 @@ failure mode on top.
    62.5%.
 2. **The escalation hint stays rare** (0-2 of 8 rollouts across all pairs),
    so band positions come from reason feedback, not legal-move lookup.
-3. **First training run launched 2026-09-17** on the 4B pair:
-   run `magic-sort-e--qwen3.5-4b--w7ef3i`, config
-   [configs/train-qwen35-4b-micro4.toml](../configs/train-qwen35-4b-micro4.toml).
-   Results pending; no training claims until there is a curve.
+3. **The 4B pair was launched first (2026-09-17) and blocked by a platform
+   bug**, not by the environment: the hosted training image ships a legacy
+   `connect-python` package its own `prime-sandboxes` guard rejects, and any
+   env whose dependencies upgrade `verifiers` or `prime-sandboxes` breaks the
+   harness. Three launches failed at $0 before the wheel was repackaged as a
+   pure plugin (dependencies: `datasets` only — see `pyproject.toml`).
+   Retry the 4B config when the platform image is fixed.
+
+### First Training Run (2026-09-18)
+
+Hosted LoRA GRPO on Prime Intellect: run `magic-sort-e--qwen3.5-9b--xbxz8z`,
+`Qwen/Qwen3.5-9B` on the shipped `trivial` tier, config
+[configs/train-qwen35-9b-trivial.toml](../configs/train-qwen35-9b-trivial.toml)
+(60 steps x 64 rollouts, GRPO groups of 8, `max_tokens` 400, thinking
+disabled). Total cost **$17.48** (120M tokens: 10.96M training, 108M
+inference). Env version `0.1.3`.
+
+**Train reward, per-batch mean (selected steps):**
+
+| Step | Mean | p10 | p90 |
+|---:|---|---|---|
+| 0 | 0.598 | 0.225 | 1.665 |
+| 10 | 0.826 | 0.203 | 1.710 |
+| 20 | 1.521 | 0.239 | 1.991 |
+| 30 | 1.670 | 1.555 | 1.927 |
+| 40 | 1.784 | 1.663 | 1.927 |
+| 47 | 1.843 | 1.659 | 2.000 |
+| 59 | 1.800 | 1.669 | 2.000 |
+
+**Frozen eval split (20 puzzles x 2 rollouts, temperature 0), every 15
+steps:**
+
+| Step | Reward | Illegal-move rate | Mean turns |
+|---:|---|---|---|
+| 0 (base model) | 1.013 | 0.592 | 18.95 |
+| 15 | 1.181 | 0.545 | 17.98 |
+| 30 | 1.620 | 0.440 | 16.38 |
+| 45 | 1.661 | 0.442 | 16.15 |
+| 60 | 1.456 | 0.409 | 15.08 |
+
+**Findings:**
+
+1. **The reward curve rises.** Train batch mean 0.60 -> ~1.80 plateau from
+   step ~33; batch p10 went 0.23 -> 1.67, meaning by the plateau virtually
+   every rollout in every batch solves. The reward ceiling (solve +
+   efficiency at par + format) is 2.2.
+2. **The frozen split confirms learning, not reward farming.** Held-out
+   reward rose 1.013 -> 1.661 at step 45; illegal-move rate fell
+   monotonically (0.59 -> 0.41) and solutions got shorter (19 -> 15 turns).
+   `legal_hint_count` was 0 for the entire run — the escalation hint never
+   fired, so none of the gain came from legal-move lookup.
+3. **Late-run drift is visible and honest.** The step-60 eval dipped to
+   1.456 while train reward held ~1.8. The step-45 checkpoint
+   (`t3xlw91ycjc1abzxce1pwt34`) is the artifact worth keeping.
+4. **Platform integration was the hard part.** Three $0 failed launches
+   traced to the hosted image's dependency stack; the durable rule is that
+   an environment wheel must be a pure plugin over the runtime's own
+   packages (see the annotated `dependencies` block in `pyproject.toml`).
 
 ### Deterministic Exploit Pass
 

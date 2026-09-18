@@ -6,7 +6,7 @@ Take a shipped game mechanic, turn it into a reusable RL environment, and
 document the reward design well enough that another environment builder can
 audit it.
 
-Status: **engine-tested, eval-run, trainer-unverified.**
+Status: **engine-tested, eval-run, trainer-verified (one LoRA run).**
 
 - Mechanics, generator, exact par, and reward decomposition are covered by
   tests (`uv run pytest`).
@@ -21,8 +21,12 @@ Status: **engine-tested, eval-run, trainer-unverified.**
 - A local Ollama band probe found the first trainable pair:
   `qwen2.5:7b-instruct` on `micro` solved 4/8 after illegal-move feedback was
   added. This is a band read, not a training result.
-- No training run has been performed. The `dataset` (train) split, shaped
-  rewards as gradient, and group variance as advantage have never executed.
+- One hosted LoRA GRPO run has completed (2026-09-18): `Qwen/Qwen3.5-9B` on
+  `trivial`, 60 steps, $17.48. Train reward rose 0.60 -> ~1.80 and held-out
+  frozen-split reward rose 1.01 -> 1.66 (peak) with the illegal-move rate
+  falling throughout and zero legal-move hints shown. See
+  [results/results.md](results/results.md). That is one run on one tier;
+  no broader training claims are made.
 
 ## Why This Exists
 
@@ -149,9 +153,14 @@ reward and pass rates.
 
 ## Honest Limits
 
-- Engine-tested and eval-run, but **no training run has happened**. The first
-  local trainable band is `qwen2.5:7b-instruct` on `micro` after illegal-move
-  feedback (4/8 solves, reward std 0.593). See [results/results.md](results/results.md).
+- Exactly **one training run** backs the trainer-verified claim: LoRA GRPO,
+  one model (`Qwen3.5-9B`), one tier (`trivial`), 60 steps. The final-step
+  eval dipped below the step-45 peak (1.46 vs 1.66); no claim is made about
+  longer runs, other tiers, or full fine-tunes. See
+  [results/results.md](results/results.md).
+- Hosted-training packaging is constrained by the platform image: the wheel
+  deliberately declares no `verifiers` dependency (see `pyproject.toml`).
+  Local development installs the toolchain via `uv sync --extra dev`.
 - `results/` numbers are small-sample. Ollama-served models are quantized.
 - Hidden layers and stuck bottles are unit-tested but have not been observed in
   a live model rollout.

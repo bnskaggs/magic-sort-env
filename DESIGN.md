@@ -5,13 +5,18 @@ where the skill lives.
 
 ## Artifact Status
 
-Magic Sort Env is **engine-tested, eval-run, trainer-unverified**.
+Magic Sort Env is **engine-tested, eval-run, trainer-verified (one LoRA
+run)**.
 
 It exposes the same `load_environment()` interface used by Prime Intellect's
 `verifiers` environments and has train/eval splits, generated tasks, reward
 shaping, and difficulty knobs. The engine and reward are covered by tests and a
-deterministic exploit pass. Live evals and local band probes have run. What has
-*not* happened: any training run at all. The README does not claim otherwise.
+deterministic exploit pass. Live evals, local band probes, and one hosted LoRA
+GRPO run (`Qwen3.5-9B` on `trivial`, 2026-09-18) have run; the training curve
+rose on both the train batches and a frozen eval split with zero legal-move
+hints shown, which is the design's core claim surviving contact with a real
+trainer. Scope stays narrow: one run, one model, one tier. The README does not
+claim otherwise.
 
 ## Design Choices
 
