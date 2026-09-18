@@ -1,0 +1,42 @@
+# Second launch attempt: Qwen3.5-9B on the shipped trivial tier.
+# Preflight (bf16 hosted, 4x2 rollouts): 4/8 solves, reward 0.984 +/- 0.668 -
+# dead center of the 20-80% band. The ruled-first 4B pair is blocked by a
+# platform-image bug on the 4B shared cluster (legacy connect-python in the
+# base image kills prime_sandboxes at import; runs w7ef3ieinada4h9ai1heeiwf,
+# ptq43voiiqrsodu9l4r3qqwc; reported 2026-09-17). The 9B rides a different
+# shared deployment, which is the point of trying it.
+# Cost sketch: ~19 turns/rollout on trivial, ~15-19k input tokens/rollout.
+# 60 steps x 64 rollouts = 3,840 consumed (~7,700 generated at 2x
+# oversampling) = roughly $25-30 at $0.20/M in, $0.60/M out+train. Monitor
+# with `prime train usage`.
+# enable_thinking=false is load-bearing: with thinking on, Qwen3.5 burns the
+# whole token budget in reasoning_content and emits no move at all.
+
+model = "Qwen/Qwen3.5-9B"
+max_steps = 60
+batch_size = 64
+rollouts_per_example = 8
+
+[sampling]
+max_tokens = 400
+enable_thinking = false
+
+[[env]]
+id = "bnskaggs/magic-sort-env"
+args = { tier = "trivial" }
+
+# eval_config came back null on the first launch with a bare [eval] block;
+# naming the env explicitly this time.
+[eval]
+interval = 15
+num_examples = 20
+rollouts_per_example = 2
+
+[eval.sampling]
+max_tokens = 400
+temperature = 0.0
+enable_thinking = false
+
+[[eval.env]]
+id = "bnskaggs/magic-sort-env"
+args = { tier = "trivial" }
