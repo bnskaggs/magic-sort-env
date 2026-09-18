@@ -818,25 +818,25 @@ wheels = [
 
 [[package]]
 name = "magic-sort-env"
-version = "0.1.2"
+version = "0.1.3"
 source = { editable = "." }
 dependencies = [
     { name = "datasets" },
-    { name = "prime-sandboxes" },
-    { name = "verifiers" },
 ]
 
 [package.optional-dependencies]
 dev = [
+    { name = "prime-sandboxes" },
     { name = "pytest" },
+    { name = "verifiers" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "datasets", specifier = ">=5.0.0" },
-    { name = "prime-sandboxes", specifier = ">=0.2.35,<0.2.39" },
+    { name = "datasets" },
+    { name = "prime-sandboxes", marker = "extra == 'dev'", specifier = ">=0.2.35,<0.2.39" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
-    { name = "verifiers", specifier = ">=0.3.0,<0.3.1" },
+    { name = "verifiers", marker = "extra == 'dev'", specifier = ">=0.3.0,<0.3.1" },
 ]
 provides-extras = ["dev"]
 
