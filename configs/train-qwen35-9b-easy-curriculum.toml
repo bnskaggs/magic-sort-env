@@ -1,0 +1,41 @@
+# Curriculum run 2: warm-start from the trivial-trained step-45 checkpoint
+# and train on easy (4 colors - never seen during run 1).
+# Gate already measured (2026-09-18 transfer test): the step-45 adapter
+# scores 0.730 avg on the easy eval split - mid-band. Base 9B scores 0.410.
+# Dual-tier eval: easy tracks learning, trivial tracks forgetting.
+# Budget: 50 steps x 64 rollouts; easy rollouts run longer than trivial's,
+# est. $18-22 total against run 1's measured $17.48 for 60 steps.
+
+model = "Qwen/Qwen3.5-9B"
+checkpoint_id = "t3xlw91ycjc1abzxce1pwt34"
+max_steps = 50
+batch_size = 64
+rollouts_per_example = 8
+
+[sampling]
+max_tokens = 400
+enable_thinking = false
+
+[[env]]
+id = "bnskaggs/magic-sort-env"
+args = { tier = "easy" }
+
+[eval]
+interval = 15
+num_examples = 20
+rollouts_per_example = 2
+
+[eval.sampling]
+max_tokens = 400
+temperature = 0.0
+enable_thinking = false
+
+[[eval.env]]
+name = "easy"
+id = "bnskaggs/magic-sort-env"
+args = { tier = "easy" }
+
+[[eval.env]]
+name = "trivial"
+id = "bnskaggs/magic-sort-env"
+args = { tier = "trivial" }
