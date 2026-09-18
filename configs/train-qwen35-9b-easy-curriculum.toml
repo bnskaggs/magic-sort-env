@@ -3,12 +3,17 @@
 # Gate already measured (2026-09-18 transfer test): the step-45 adapter
 # scores 0.730 avg on the easy eval split - mid-band. Base 9B scores 0.410.
 # Dual-tier eval: easy tracks learning, trivial tracks forgetting.
-# Budget: 50 steps x 64 rollouts; easy rollouts run longer than trivial's,
-# est. $18-22 total against run 1's measured $17.48 for 60 steps.
+#
+# GOTCHA (measured the hard way, $3.87): max_steps is ABSOLUTE, not
+# incremental - a warm-start from a step-45 checkpoint resumes the counter at
+# 46, so max_steps = 50 trained only 5 steps (run p2wvhe7t5s1sa3gu234kmn35;
+# those 5 steps did move easy train reward 1.52 -> 1.71). max_steps = 75
+# below means 30 new steps on top of the checkpoint's 45.
+# Budget: ~$0.77/step measured on easy -> ~$23 for 30 steps.
 
 model = "Qwen/Qwen3.5-9B"
 checkpoint_id = "t3xlw91ycjc1abzxce1pwt34"
-max_steps = 50
+max_steps = 75
 batch_size = 64
 rollouts_per_example = 8
 
@@ -20,8 +25,11 @@ enable_thinking = false
 id = "bnskaggs/magic-sort-env"
 args = { tier = "easy" }
 
+[checkpoints]
+interval = 10
+
 [eval]
-interval = 15
+interval = 10
 num_examples = 20
 rollouts_per_example = 2
 
