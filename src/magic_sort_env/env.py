@@ -11,7 +11,10 @@ import re
 from collections import Counter
 from typing import Any
 
-import verifiers.legacy as vf
+# verifiers 0.3.0 exposes the v0 API at top level; 0.3.1 moved it to
+# verifiers.legacy. We pin <0.3.1 for hosted-training image compatibility
+# (see pyproject.toml), so import the top-level surface.
+import verifiers as vf
 from datasets import Dataset
 
 from . import core

@@ -1,6 +1,6 @@
 import asyncio
 
-import verifiers.legacy as vf
+import verifiers as vf
 from datasets import Dataset
 
 from magic_sort_env import core

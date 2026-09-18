@@ -1,6 +1,6 @@
 [project]
 name = "magic-sort-env"
-version = "0.1.1"
+version = "0.1.2"
 description = "A Magic Sort / water-sort RL environment with solver-verified par, exploit-aware rewards, and partial-information variants."
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
@@ -8,13 +8,19 @@ license = { text = "MIT" }
 authors = [{ name = "bnskaggs" }]
 dependencies = [
     "datasets>=5.0.0",
-    "verifiers>=0.3.1",
-    # This env never uses sandboxes, but verifiers imports prime_sandboxes
-    # eagerly. 0.3.0 added a hard reject when a legacy connect-python package
-    # is present, which killed the hosted env-server on 2026-09-17 (run
-    # w7ef3ieinada4h9ai1heeiwf) because the training base image ships it.
-    # 0.2.x coexists fine. Drop this pin when the platform image is clean.
-    "prime-sandboxes>=0.2.42,<0.3.0",
+    # Hosted-training compatibility pins (2026-09-18). The training base image
+    # ships legacy connect-python==0.9.0 in /app/.venv; prime-sandboxes >=
+    # 0.2.39 switched to the renamed connectrpc distribution and hard-rejects
+    # any venv where connect-python is still present, so every env install
+    # that drags in a connectrpc-era prime-sandboxes kills the env-server at
+    # import (runs w7ef3ieinada4h9ai1heeiwf, ptq43voiiqrsodu9l4r3qqwc,
+    # hgpgo4r6nleas396itfoth18 across two clusters). verifiers 0.3.1 requires
+    # prime-sandboxes>=0.2.39, so it can never coexist with that image;
+    # verifiers 0.3.0 accepts >=0.2.35, and 0.2.35-0.2.38 still use
+    # connect-python. This env never uses sandboxes - the import is eager via
+    # verifiers. Relax both pins when the platform image drops connect-python.
+    "verifiers>=0.3.0,<0.3.1",
+    "prime-sandboxes>=0.2.35,<0.2.39",
 ]
 
 [project.optional-dependencies]
