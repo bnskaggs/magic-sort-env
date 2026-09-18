@@ -253,6 +253,36 @@ steps:**
    an environment wheel must be a pure plugin over the runtime's own
    packages (see the annotated `dependencies` block in `pyproject.toml`).
 
+### Post-Run Analyses (2026-09-18)
+
+Both the step-45 checkpoint and the final (step-60) adapter were deployed via
+Prime's adapter serving and re-evaluated under controlled decode (same 20-
+puzzle frozen split, temperature 0, 1 rollout, thinking disabled).
+
+**The step-60 eval dip is mostly puzzle-specific, not a capability slide.**
+Per-puzzle comparison: step-45 fails puzzles {7, 16}; step-60 fails
+{6, 7, 16}. Two of the three step-60 failures are persistent misses that fail
+under *both* checkpoints (#7 runs 28 turns at a 73%+ illegal rate under both
+— it is simply a harder instance). The genuine regression is one puzzle (#6).
+Aggregate re-run scores: step-45 = 1.595 (18/20), step-60 = 1.541 (17/20) —
+much closer than the hosted eval suggested (1.661 vs 1.456), so a chunk of
+the hosted dip is decode nondeterminism on a 20-puzzle sample. Step-45
+remains the keeper checkpoint, but the late-run damage is one puzzle, not
+three.
+
+**Transfer test: the weights generalize to a harder, unseen tier.** The model
+trained only on `trivial` (3 colors). On the `easy` eval split (4 colors, 20
+puzzles, temperature 0):
+
+| Model | Reward on `easy` |
+|---|---|
+| `Qwen/Qwen3.5-9B` base | 0.410 +/- 0.396 |
+| + step-45 LoRA (trained on `trivial` only) | **0.730 +/- 0.616** |
+
+The trained adapter nearly doubles the base score on a board size it never
+saw. Sample is 20 puzzles at greedy decode — the gap is roughly 2-3 standard
+errors, directionally solid, not precision-measured.
+
 ### Deterministic Exploit Pass
 
 Command: `uv run python -m magic_sort_env.exploits`.
