@@ -1,0 +1,29 @@
+# First hosted LoRA run: Qwen3.5-4B on micro + 4 empties.
+# Pair chosen 2026-09-17 from hosted bf16 preflights (4 puzzles x 2 rollouts):
+#   4B micro+4empties: 5/8 solves, reward 1.271 +/- 0.734  <- this run
+#   9B trivial:        4/8 solves, reward 0.984 +/- 0.668  (follow-up candidate)
+# enable_thinking=false is load-bearing: with thinking on, Qwen3.5 burns the
+# whole token budget in reasoning_content and emits no move at all.
+
+model = "Qwen/Qwen3.5-4B"
+max_steps = 100
+batch_size = 64
+rollouts_per_example = 8
+
+[sampling]
+max_tokens = 400
+enable_thinking = false
+
+[[env]]
+id = "bnskaggs/magic-sort-env"
+args = { tier = "micro", n_empty = 4 }
+
+[eval]
+interval = 25
+num_examples = 20
+rollouts_per_example = 2
+
+[eval.sampling]
+max_tokens = 400
+temperature = 0.0
+enable_thinking = false

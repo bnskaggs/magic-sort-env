@@ -161,6 +161,44 @@ illegal moves trigger a legal-move list.
    result. Hosted training should use the closest available bf16 model and keep
    the solve-rate gate as the preflight check.
 
+### Hosted Preflights (Prime Inference, bf16, post illegal-feedback fix)
+
+Purpose: re-run the 20-80% solve-rate gate on the exact bf16 models available
+for hosted training, before spending training tokens. 4 puzzles x 2 rollouts,
+`--max-tokens 400`, thinking disabled via
+`extra_body.chat_template_kwargs.enable_thinking=false`.
+
+**Thinking mode is disqualifying at this token budget.** With thinking left
+on, `Qwen/Qwen3.5-4B` burned all 400 tokens in `reasoning_content` and
+returned empty `content` on every rollout; the follow-up turn then failed
+API-side (422: assistant message with no content). This reproduces the
+`qwen3:1.7b` local finding on a hosted bf16 model and adds an API-level
+failure mode on top.
+
+| Model | Tier | Solves | Reward | Illegal rate | Legal hints |
+|---|---|---:|---|---:|---:|
+| `Qwen/Qwen3.5-4B` | `micro` | 1/8 | 0.556 +/- 0.550 | 0.537 | 1 |
+| `Qwen/Qwen3.5-9B` | `micro` | 6/8 | 1.329 +/- 0.571 | 0.402 | 2 |
+| `Qwen/Qwen3.5-9B` | `trivial` | 4/8 | 0.984 +/- 0.668 | 0.588 | 1 |
+| `Qwen/Qwen3.5-4B` | `micro` + `n_empty=4` | 5/8 | 1.271 +/- 0.734 | 0.406 | 0 |
+
+(`pass@k` lines from vf-eval overcount by including any rollout with reward
+>= 0.5; solve counts above use the >= 1.0 solve floor.)
+
+**Findings:**
+
+1. **Two trainable pairs exist.** `Qwen3.5-9B` on `trivial` sits dead center
+   (50%, shipped tier); `Qwen3.5-4B` on `micro`+4-empties is 62.5% with the
+   highest reward spread at half the token price. The difficulty dial worked
+   exactly as designed: one `n_empty` override moved the 4B from 12.5% to
+   62.5%.
+2. **The escalation hint stays rare** (0-2 of 8 rollouts across all pairs),
+   so band positions come from reason feedback, not legal-move lookup.
+3. **First training run launched 2026-09-17** on the 4B pair:
+   run `magic-sort-e--qwen3.5-4b--w7ef3i`, config
+   [configs/train-qwen35-4b-micro4.toml](../configs/train-qwen35-4b-micro4.toml).
+   Results pending; no training claims until there is a curve.
+
 ### Deterministic Exploit Pass
 
 Command: `uv run python -m magic_sort_env.exploits`.
